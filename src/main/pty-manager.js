@@ -26,16 +26,17 @@ function getDefaultShell() {
  * @param {string} opts.cwd - 工作目录
  * @param {string} [opts.resumeId] - 恢复的 claude session id
  * @param {string} [opts.shell] - 指定 shell（默认 pwsh/cmd）
+ * @param {string} [opts.mode] - 启动模式：default / yolo / plan
  * @param {function} opts.onData - PTY 数据回调 (sessionId, data)
  * @param {function} opts.onExit - PTY 退出回调 (sessionId, exitCode)
  * @returns {{ internalId: string, ptyPid: number }}
  */
-function createSession({ cwd, resumeId, shell, onData, onExit }) {
+function createSession({ cwd, resumeId, shell, mode, onData, onExit }) {
   const internalId = randomUUID();
   const shellPath = shell || getDefaultShell();
   const sessionCwd = cwd || process.cwd();
 
-  console.log('[PTY] Creating session:', { shellPath, sessionCwd, resumeId });
+  console.log('[PTY] Creating session:', { shellPath, sessionCwd, resumeId, mode });
 
   let ptyProcess;
   try {
@@ -56,7 +57,7 @@ function createSession({ cwd, resumeId, shell, onData, onExit }) {
     ptyProcess,
     ptyPid: ptyProcess.pid,
     cwd: sessionCwd,
-    claudeSessionId: null,
+    claudeSessionId: resumeId || null,  // 恢复时直接预填，不等 hook 事件
     createdAt: Date.now(),
     name: null,
     status: 'running',
@@ -75,12 +76,23 @@ function createSession({ cwd, resumeId, shell, onData, onExit }) {
     if (onExit) onExit(internalId, exitCode);
   });
 
-  // 延迟注入 claude 命令
+  // 延迟注入 claude 命令（直接写 ptyProcess，不经过 writeInput，不触发自动命名）
   setTimeout(() => {
-    const cmd = resumeId
-      ? `claude --resume ${resumeId}\r`
-      : `claude\r`;
-    ptyProcess.write(cmd);
+    let cmd = 'claude';
+    if (resumeId) {
+      cmd += ` --resume ${resumeId}`;
+    } else {
+      switch (mode) {
+        case 'yolo':
+          cmd += ' --dangerously-skip-permissions';
+          break;
+        case 'plan':
+          cmd += ' --plan';
+          break;
+        // 'default' = no extra flags
+      }
+    }
+    ptyProcess.write(cmd + '\r');
   }, 300);
 
   return { internalId, ptyPid: ptyProcess.pid };
@@ -96,9 +108,8 @@ function writeInput(sessionId, data) {
     if (inputEventCallback) {
       if (data.includes('\r') || data.includes('\n')) {
         inputEventCallback(sessionId, 'PTY_ENTER');
-      }
-      // 单独的 Esc 键（长度 1 的 \x1b），排除 ANSI 转义序列（\x1b[ ...）
-      if (data === '\x1b') {
+      } else if (data === '\x1b') {
+        // 单独的 Esc 键
         inputEventCallback(sessionId, 'PTY_ESC');
       }
     }

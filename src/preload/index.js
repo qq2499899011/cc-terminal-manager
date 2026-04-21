@@ -20,6 +20,9 @@ const SESSION_STATUS_CHANGE = 'session:status-change';
 const SESSION_BIND_CLAUDE_ID = 'session:bind-claude-id';
 const SESSION_REPORT_STATUS = 'session:report-status';
 const SESSION_ACTIVATED = 'session:activated';
+const HISTORY_SEARCH = 'history:search';
+const SESSION_FOCUS = 'session:focus';
+const SESSION_AUTO_NAME = 'session:auto-name';
 
 contextBridge.exposeInMainWorld('ccAPI', {
   // Session management
@@ -74,4 +77,21 @@ contextBridge.exposeInMainWorld('ccAPI', {
     ipcRenderer.on(SESSION_BIND_CLAUDE_ID, handler);
     return () => ipcRenderer.removeListener(SESSION_BIND_CLAUDE_ID, handler);
   },
+
+  // 通知点击定位到对应 session
+  onSessionFocus: (cb) => {
+    const handler = (_e, sessionId) => cb(sessionId);
+    ipcRenderer.on(SESSION_FOCUS, handler);
+    return () => ipcRenderer.removeListener(SESSION_FOCUS, handler);
+  },
+
+  // 自动命名推送
+  onSessionAutoName: (cb) => {
+    const handler = (_e, sessionId, name) => cb(sessionId, name);
+    ipcRenderer.on(SESSION_AUTO_NAME, handler);
+    return () => ipcRenderer.removeListener(SESSION_AUTO_NAME, handler);
+  },
+
+  // 全文搜索历史
+  searchHistory: (query) => ipcRenderer.invoke(HISTORY_SEARCH, query),
 });

@@ -6,8 +6,23 @@ let currentTab = 'new'; // 'new' | 'resume'
 let historySessions = [];
 let cwdList = [];
 let searchQuery = '';
+let lastUsedCwd = '';
+let lastUsedMode = 'default';
 
-export async function showNewSessionModal(onCreateSession) {
+// 外部注入的回调
+let _onCreateSession = null;
+let _getOpenSessionIds = null;
+let _onActivateExisting = null;
+
+// 全文搜索相关
+let _fullTextMatchIds = null; // Set<sessionId> | null
+let _searchDebounceTimer = null;
+
+export async function showNewSessionModal(onCreateSession, opts = {}) {
+  _onCreateSession = onCreateSession;
+  _getOpenSessionIds = opts.getOpenSessionIds || null;
+  _onActivateExisting = opts.onActivateExisting || null;
+
   // 加载数据
   try {
     [historySessions, cwdList] = await Promise.all([
@@ -21,17 +36,28 @@ export async function showNewSessionModal(onCreateSession) {
   }
 
   searchQuery = '';
+  _fullTextMatchIds = null;
   currentTab = 'new';
-  render(onCreateSession);
+  render();
   modalOverlay.classList.remove('hidden');
 }
 
 export function hideModal() {
   modalOverlay.classList.add('hidden');
   modalOverlay.innerHTML = '';
+  if (_searchDebounceTimer) {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = null;
+  }
 }
 
-function render(onCreateSession) {
+/** 读取当前弹窗中模式下拉的值 */
+function getSelectedMode() {
+  const sel = modalOverlay.querySelector('#mode-select');
+  return sel ? sel.value : lastUsedMode;
+}
+
+function render() {
   modalOverlay.innerHTML = `
     <div class="modal">
       <div class="modal-header">
@@ -40,6 +66,14 @@ function render(onCreateSession) {
           <span class="modal-tab ${currentTab === 'resume' ? 'active' : ''}" data-tab="resume">从历史恢复</span>
         </div>
         <span class="modal-close" style="cursor:pointer;font-size:18px;">×</span>
+      </div>
+      <div class="modal-mode-bar" style="padding:8px 16px;border-bottom:1px solid #313244;display:flex;align-items:center;gap:8px;">
+        <label style="color:var(--text-secondary);font-size:12px;flex-shrink:0;">启动模式</label>
+        <select id="mode-select" style="background:var(--bg-overlay);border:1px solid #313244;color:var(--text-primary);padding:4px 8px;border-radius:4px;font-size:12px;flex:1;">
+          <option value="default" ${lastUsedMode === 'default' ? 'selected' : ''}>默认</option>
+          <option value="yolo" ${lastUsedMode === 'yolo' ? 'selected' : ''}>YOLO模式 (跳过权限确认)</option>
+          <option value="plan" ${lastUsedMode === 'plan' ? 'selected' : ''}>Plan模式 (仅规划)</option>
+        </select>
       </div>
       <div class="modal-body">
         ${currentTab === 'new' ? renderNewTab() : renderResumeTab()}
@@ -52,6 +86,12 @@ function render(onCreateSession) {
     </div>
   `;
 
+  // 模式下拉变更时记住选择
+  const modeSelect = modalOverlay.querySelector('#mode-select');
+  modeSelect.addEventListener('change', () => {
+    lastUsedMode = modeSelect.value;
+  });
+
   // 事件绑定
   modalOverlay.querySelector('.modal-close').addEventListener('click', hideModal);
   modalOverlay.addEventListener('click', (e) => {
@@ -61,8 +101,10 @@ function render(onCreateSession) {
   // Tab 切换
   modalOverlay.querySelectorAll('.modal-tab').forEach(tab => {
     tab.addEventListener('click', () => {
+      // 切换前保存当前模式选择
+      lastUsedMode = getSelectedMode();
       currentTab = tab.dataset.tab;
-      render(onCreateSession);
+      render();
     });
   });
 
@@ -79,7 +121,10 @@ function render(onCreateSession) {
 
     createBtn.addEventListener('click', () => {
       const cwd = cwdInput.value.trim() || cwdList[0] || 'C:\\projects\\AI-Studio';
-      onCreateSession(cwd, null);
+      const mode = getSelectedMode();
+      lastUsedCwd = cwd;
+      lastUsedMode = mode;
+      _onCreateSession(cwd, null, mode);
       hideModal();
     });
 
@@ -96,18 +141,33 @@ function render(onCreateSession) {
       searchInput.value = searchQuery;
       searchInput.addEventListener('input', (e) => {
         searchQuery = e.target.value;
-        renderSessionList(onCreateSession);
+        // 立即做元数据过滤
+        _fullTextMatchIds = null;
+        renderSessionList();
+
+        // 防抖全文搜索（>= 2 字符时触发）
+        if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+        if (searchQuery.trim().length >= 2) {
+          _searchDebounceTimer = setTimeout(async () => {
+            try {
+              const matchingIds = await window.ccAPI.searchHistory(searchQuery.trim());
+              _fullTextMatchIds = new Set(matchingIds);
+              renderSessionList();
+            } catch (e) {
+              console.error('Full-text search failed:', e);
+            }
+          }, 300);
+        }
       });
       searchInput.focus();
     }
 
     // session 点击
-    bindSessionClicks(onCreateSession);
+    bindSessionClicks();
   }
 }
 
 function renderNewTab() {
-  // cwdList 已经是从所有历史 session 去重的完整 cwd 集合
   const options = cwdList.map(c => `<option value="${escHtml(c)}">`).join('');
   return `
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -115,7 +175,7 @@ function renderNewTab() {
       <div style="display:flex;gap:8px;">
         <input type="text" id="cwd-input" list="cwd-datalist"
                placeholder="选择或输入工作目录..."
-               value=""
+               value="${escHtml(lastUsedCwd)}"
                style="flex:1;">
         <datalist id="cwd-datalist">${options}</datalist>
         <button class="btn btn-secondary" id="btn-browse">浏览</button>
@@ -128,22 +188,30 @@ function renderNewTab() {
 function renderResumeTab() {
   return `
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <input type="search" id="search-input" placeholder="搜索 session...">
+      <input type="search" id="search-input" placeholder="搜索 session（支持全文搜索）...">
       <div id="session-list-container" style="max-height:400px;overflow-y:auto;"></div>
     </div>
   `;
 }
 
-function renderSessionList(onCreateSession) {
+function renderSessionList() {
   const container = modalOverlay.querySelector('#session-list-container');
   if (!container) return;
 
   const q = searchQuery.toLowerCase();
+  const openIds = _getOpenSessionIds ? _getOpenSessionIds() : new Set();
+
   const filtered = historySessions.filter(s => {
     if (!q) return true;
-    return (s.cwd || '').toLowerCase().includes(q) ||
+    // 元数据匹配
+    const metaMatch = (s.cwd || '').toLowerCase().includes(q) ||
            (s.title || '').toLowerCase().includes(q) ||
+           (s.customName || '').toLowerCase().includes(q) ||
            (s.sessionId || '').toLowerCase().includes(q);
+    if (metaMatch) return true;
+    // 全文搜索结果匹配
+    if (_fullTextMatchIds && _fullTextMatchIds.has(s.sessionId)) return true;
+    return false;
   });
 
   // 按 cwd 分组
@@ -171,8 +239,15 @@ function renderSessionList(onCreateSession) {
       <div class="resume-cwd-items" id="${groupId}">`;
     for (const s of items.slice(0, 30)) {
       const time = new Date(s.lastMtime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      html += `<div class="resume-item" data-session-id="${escHtml(s.sessionId)}" data-cwd="${escHtml(s.cwd || '')}">
-        <div style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(s.title || '(empty)')}</div>
+      const isOpen = openIds.has(s.sessionId);
+      // B5: 优先显示自定义名称
+      const displayName = s.customName || s.title || '(empty)';
+      const subtitle = s.customName && s.title ? `<span style="font-size:10px;color:var(--text-muted);margin-left:4px;">${escHtml(s.title.slice(0, 40))}</span>` : '';
+      const openBadge = isOpen ? '<span style="color:var(--green);font-size:10px;margin-left:auto;flex-shrink:0;">已打开</span>' : '';
+      html += `<div class="resume-item" data-session-id="${escHtml(s.sessionId)}" data-cwd="${escHtml(s.cwd || '')}" data-is-open="${isOpen}">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(displayName)}</span>${subtitle}${openBadge}
+        </div>
         <div style="font-size:11px;color:var(--text-muted);">${time} · ${escHtml(s.sessionId.slice(0, 8))}</div>
       </div>`;
     }
@@ -196,15 +271,26 @@ function renderSessionList(onCreateSession) {
     });
   });
 
-  bindSessionClicks(onCreateSession);
+  bindSessionClicks();
 }
 
-function bindSessionClicks(onCreateSession) {
+function bindSessionClicks() {
   modalOverlay.querySelectorAll('.resume-item').forEach(el => {
     el.addEventListener('click', () => {
       const sessionId = el.dataset.sessionId;
       const cwd = el.dataset.cwd;
-      onCreateSession(cwd, sessionId);
+
+      // B3: 已打开的 session 直接跳转，不新建
+      if (el.dataset.isOpen === 'true' && _onActivateExisting) {
+        _onActivateExisting(sessionId);
+        hideModal();
+        return;
+      }
+
+      const mode = getSelectedMode();
+      lastUsedCwd = cwd;
+      lastUsedMode = mode;
+      _onCreateSession(cwd, sessionId, mode);
       hideModal();
     });
   });
@@ -212,7 +298,7 @@ function bindSessionClicks(onCreateSession) {
   // 初始渲染 session list
   const container = modalOverlay.querySelector('#session-list-container');
   if (container && !container.hasChildNodes()) {
-    renderSessionList(onCreateSession);
+    renderSessionList();
   }
 }
 

@@ -15,9 +15,13 @@ export const HOOKS_ENABLE = 'hooks:enable';
 export const HOOKS_DISABLE = 'hooks:disable';
 export const OPEN_DIRECTORY_DIALOG = 'dialog:open-directory';
 export const SESSION_REPORT_STATUS = 'session:report-status';
+export const SESSION_ACTIVATED = 'session:activated';
+export const HISTORY_SEARCH = 'history:search';
 
 // 主 → 渲染
 export const PTY_DATA = 'pty:data';
 export const PTY_EXIT = 'pty:exit';
 export const SESSION_STATUS_CHANGE = 'session:status-change';
 export const SESSION_BIND_CLAUDE_ID = 'session:bind-claude-id';
+export const SESSION_FOCUS = 'session:focus';
+export const SESSION_AUTO_NAME = 'session:auto-name';

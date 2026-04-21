@@ -16,12 +16,15 @@ const HOOKS_DISABLE = 'hooks:disable';
 const OPEN_DIRECTORY_DIALOG = 'dialog:open-directory';
 const SESSION_REPORT_STATUS = 'session:report-status';
 const SESSION_ACTIVATED = 'session:activated';
+const HISTORY_SEARCH = 'history:search';
 
 // 主 → 渲染
 const PTY_DATA = 'pty:data';
 const PTY_EXIT = 'pty:exit';
 const SESSION_STATUS_CHANGE = 'session:status-change';
 const SESSION_BIND_CLAUDE_ID = 'session:bind-claude-id';
+const SESSION_FOCUS = 'session:focus';
+const SESSION_AUTO_NAME = 'session:auto-name';
 
 module.exports = {
   SESSION_CREATE, SESSION_KILL, SESSION_RENAME, SESSION_LIST,
@@ -30,4 +33,5 @@ module.exports = {
   HOOKS_ENABLE, HOOKS_DISABLE, OPEN_DIRECTORY_DIALOG,
   SESSION_STATUS_CHANGE, SESSION_BIND_CLAUDE_ID,
   SESSION_REPORT_STATUS, SESSION_ACTIVATED,
+  HISTORY_SEARCH, SESSION_FOCUS, SESSION_AUTO_NAME,
 };

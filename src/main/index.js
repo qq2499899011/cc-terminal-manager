@@ -16,6 +16,7 @@ const {
   HOOKS_ENABLE, HOOKS_DISABLE, OPEN_DIRECTORY_DIALOG,
   SESSION_STATUS_CHANGE, SESSION_BIND_CLAUDE_ID,
   SESSION_REPORT_STATUS, SESSION_ACTIVATED,
+  HISTORY_SEARCH, SESSION_FOCUS, SESSION_AUTO_NAME,
 } = require('../shared/ipc-channels.cjs');
 
 let mainWindow = null;
@@ -104,6 +105,7 @@ ipcMain.handle(SESSION_CREATE, (_e, opts) => {
     cwd: opts.cwd,
     resumeId: opts.resumeId,
     shell: opts.shell,
+    mode: opts.mode,
     onData: (sessionId, data) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send(PTY_DATA, sessionId, data);
@@ -169,7 +171,22 @@ ipcMain.on(SESSION_ACTIVATED, (_e, sessionId) => {
 
 // IPC: History / CWD
 ipcMain.handle(HISTORY_LIST, () => {
-  return jsonlReader.listAllSessions();
+  const sessions = jsonlReader.listAllSessions();
+  // B5: 合并 session-store 中的自定义名称
+  const meta = sessionStore.load();
+  for (const s of sessions) {
+    const stored = meta.sessionMeta[s.sessionId];
+    if (stored?.name) {
+      s.customName = stored.name;
+    }
+  }
+  return sessions;
+});
+
+// IPC: 全文搜索历史
+ipcMain.handle(HISTORY_SEARCH, (_e, query) => {
+  const sessions = jsonlReader.listAllSessions();
+  return jsonlReader.searchSessions(sessions, query);
 });
 
 ipcMain.handle(CWD_HISTORY, () => {
@@ -278,15 +295,13 @@ function createTray() {
 }
 
 /**
- * 统计当前 "待机 + 等待审批" 的 session 数量
- * —— 用户已回复过但等待下一轮输入(running) 或 等待审批(needs_approval/waiting_input)
+ * 统计角标数字：绿色闪烁(pending_review) + 黄色闪烁(needs_approval)
  */
 function countPendingSessions() {
   const sessions = ptyManager.list();
   return sessions.filter(s =>
-    s.status === 'running' ||
     s.status === 'needs_approval' ||
-    s.status === 'waiting_input'
+    s.status === 'pending_review'
   ).length;
 }
 

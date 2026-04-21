@@ -208,6 +208,7 @@ function activateSession(sessionId) {
     s.container.classList.toggle('active', id === sessionId);
     if (id === sessionId) {
       s.fitAddon.fit();
+      s.term.refresh(0, s.term.rows - 1);
       s.term.focus();
     }
   }
@@ -215,10 +216,11 @@ function activateSession(sessionId) {
   renderSidebar();
 }
 
-async function newSession(cwd, resumeId) {
+async function newSession(cwd, resumeId, mode) {
   const result = await window.ccAPI.createSession({
     cwd: cwd || 'C:\\projects\\AI-Studio',
     resumeId: resumeId || undefined,
+    mode: mode || 'default',
   });
 
   const { internalId } = result;
@@ -229,6 +231,7 @@ async function newSession(cwd, resumeId) {
     info: {
       internalId,
       cwd: cwd || 'C:\\projects\\AI-Studio',
+      claudeSessionId: resumeId || null,  // 恢复时直接预填
       status: 'running',
       name: null,
       createdAt: Date.now(),
@@ -350,19 +353,75 @@ function updateStatusDotDOM(sessionId, status) {
 }
 
 /**
+ * 自动命名：从 xterm 屏幕缓冲区提取用户输入的第一条消息
+ * 在 idle → thinking 转换时调用，此时屏幕上应该还残留着用户刚输入的文本
+ * 查找最后一个 ❯ 提示符后面的文本内容
+ */
+function tryAutoName(sessionId) {
+  const s = state.sessions.get(sessionId);
+  if (!s || s._autoNamed) return;
+
+  const buf = s.term.buffer?.active;
+  if (!buf) return;
+
+  // 从屏幕底部向上扫描，找到包含 ❯ 的行
+  const totalLines = buf.length;
+  let inputText = '';
+  for (let y = totalLines - 1; y >= Math.max(0, totalLines - 50); y--) {
+    const line = buf.getLine(y);
+    if (!line) continue;
+    const text = line.translateToString(true); // trim 右侧空白
+    // 匹配 ❯ 后面的内容（CC 的输入提示符）
+    const promptIdx = text.lastIndexOf('\u276f');
+    if (promptIdx >= 0) {
+      const after = text.slice(promptIdx + 1).trim();
+      if (after) {
+        inputText = after;
+        break;
+      }
+    }
+  }
+
+  if (!inputText) return;
+
+  // 清洗：去控制字符、截取前 30 字符
+  const cleaned = inputText
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 30);
+
+  if (!cleaned) return;
+
+  s._autoNamed = true;
+  s.info.name = cleaned;
+  renderTabs();
+  renderSidebar();
+
+  // 通知 main 进程持久化
+  try { window.ccAPI.renameSession(sessionId, cleaned); } catch {}
+}
+
+/**
  * 设置 session 状态，只有变更时才触发 DOM 更新和上报
  * 在控制台打 window.CC_DEBUG=true 后会输出检测日志，便于调试
  */
 function setSessionStatus(sessionId, status) {
   const s = state.sessions.get(sessionId);
   if (!s || !status || s.info.status === status) return;
+  const prevStatus = s.info.status;
   if (window.CC_DEBUG) {
-    console.log('[CC-STATUS]', sessionId.slice(0, 8), s.info.status, '->', status);
+    console.log('[CC-STATUS]', sessionId.slice(0, 8), prevStatus, '->', status);
   }
   s.info.status = status;
   updateStatusDotDOM(sessionId, status);
   // 上报给 main 以刷新 tray + overlay 徽标
   try { window.ccAPI.reportStatusChange(sessionId, status); } catch {}
+
+  // 自动命名：idle → thinking 时从屏幕提取用户输入
+  if (prevStatus === 'running' && status === 'thinking' && !s._autoNamed) {
+    tryAutoName(sessionId);
+  }
 }
 
 /**
@@ -401,7 +460,12 @@ window.ccAPI.onPtyData((sessionId, data) => {
   if (!s) return;
   s.term.write(data);
 
-  // 默认命名 claude（只渲染一次）
+  // 当前激活终端自动滚动到底部，避免新输出不可见
+  if (sessionId === state.activeSessionId) {
+    s.term.scrollToBottom();
+  }
+
+  // 初始占位名（自动命名到达前显示）
   if (!s.info.name) {
     s.info.name = 'claude';
     renderTabs();
@@ -480,6 +544,7 @@ window.addEventListener('resize', () => {
   for (const [id, s] of state.sessions) {
     if (id === state.activeSessionId) {
       s.fitAddon.fit();
+      s.term.refresh(0, s.term.rows - 1);
     }
   }
 });
@@ -507,7 +572,10 @@ document.addEventListener('mouseup', () => {
     document.body.style.cursor = '';
     // refit active terminal
     const s = state.sessions.get(state.activeSessionId);
-    if (s) s.fitAddon.fit();
+    if (s) {
+      s.fitAddon.fit();
+      s.term.refresh(0, s.term.rows - 1);
+    }
   }
 });
 
@@ -517,9 +585,26 @@ btnNew.addEventListener('click', async () => {
   console.log('[DEBUG] ccAPI available:', !!window.ccAPI);
   console.log('[DEBUG] ccAPI.listHistory:', typeof window.ccAPI?.listHistory);
   try {
-    await showNewSessionModal((cwd, resumeId) => {
-      newSession(cwd, resumeId);
-    });
+    await showNewSessionModal(
+      (cwd, resumeId, mode) => { newSession(cwd, resumeId, mode); },
+      {
+        getOpenSessionIds: () => {
+          const ids = new Set();
+          for (const [, s] of state.sessions) {
+            if (s.info.claudeSessionId) ids.add(s.info.claudeSessionId);
+          }
+          return ids;
+        },
+        onActivateExisting: (claudeSessionId) => {
+          for (const [id, s] of state.sessions) {
+            if (s.info.claudeSessionId === claudeSessionId) {
+              activateSession(id);
+              return;
+            }
+          }
+        },
+      }
+    );
   } catch (e) {
     console.error('showNewSessionModal error:', e);
   }
@@ -600,6 +685,25 @@ document.addEventListener('contextmenu', (e) => {
   }
 });
 
+// ---- xterm 终端区域右键：选中→复制，未选中→粘贴 ----
+termContainer.addEventListener('contextmenu', async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const activeSession = state.sessions.get(state.activeSessionId);
+  if (!activeSession) return;
+  const term = activeSession.term;
+  if (term.hasSelection()) {
+    const text = term.getSelection();
+    await navigator.clipboard.writeText(text);
+    term.clearSelection();
+  } else {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) window.ccAPI.ptyInput(state.activeSessionId, text);
+    } catch {}
+  }
+});
+
 // ---- 重命名 ----
 function startRename(sessionId) {
   const s = state.sessions.get(sessionId);
@@ -647,14 +751,36 @@ sessionList.addEventListener('dblclick', (e) => {
 window.ccAPI.onSessionStatusChange((sessionId, status) => {
   const s = state.sessions.get(sessionId);
   if (!s || s.info.status === status) return;
+  const prevStatus = s.info.status;
   s.info.status = status;
   updateStatusDotDOM(sessionId, status);
+
+  // ---- 自动命名：idle → thinking 时从屏幕提取用户输入 ----
+  if (prevStatus === 'running' && status === 'thinking' && !s._autoNamed) {
+    tryAutoName(sessionId);
+  }
 });
 
 window.ccAPI.onSessionBindClaudeId((internalId, claudeSessionId) => {
   const s = state.sessions.get(internalId);
   if (s) {
     s.info.claudeSessionId = claudeSessionId;
+  }
+});
+
+// ---- 通知点击定位到对应 session ----
+window.ccAPI.onSessionFocus((sessionId) => {
+  // 先按 internalId 直接匹配
+  if (state.sessions.has(sessionId)) {
+    activateSession(sessionId);
+    return;
+  }
+  // 再按 claudeSessionId 匹配
+  for (const [id, s] of state.sessions) {
+    if (s.info.claudeSessionId === sessionId) {
+      activateSession(id);
+      return;
+    }
   }
 });
 

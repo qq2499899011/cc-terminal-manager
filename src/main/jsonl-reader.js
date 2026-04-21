@@ -100,6 +100,40 @@ function listCwds() {
 }
 
 /**
+ * 全文搜索：在 JSONL 文件内容中搜索关键词
+ * 每个文件最多读取 256KB，兼顾性能和覆盖率
+ * @param {Array} sessions - listAllSessions() 的返回值
+ * @param {string} query - 搜索关键词
+ * @returns {string[]} - 匹配的 sessionId 列表
+ */
+function searchSessions(sessions, query) {
+  if (!query) return sessions.map(s => s.sessionId);
+  const q = query.toLowerCase();
+  const matches = [];
+  for (const s of sessions) {
+    // 快速路径：元数据匹配
+    if ((s.cwd || '').toLowerCase().includes(q) ||
+        (s.title || '').toLowerCase().includes(q) ||
+        (s.sessionId || '').toLowerCase().includes(q)) {
+      matches.push(s.sessionId);
+      continue;
+    }
+    // 慢路径：读取 JSONL 文件内容
+    const jsonlPath = path.join(PROJECTS_DIR, s.projectDir, s.sessionId + '.jsonl');
+    try {
+      const fd = fs.openSync(jsonlPath, 'r');
+      const buf = Buffer.alloc(256 * 1024);
+      const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
+      fs.closeSync(fd);
+      if (buf.slice(0, bytes).toString('utf8').toLowerCase().includes(q)) {
+        matches.push(s.sessionId);
+      }
+    } catch {}
+  }
+  return matches;
+}
+
+/**
  * 获取当前运行中的 Claude Code session（从 ~/.claude/sessions/ 读取）
  */
 function listActiveSessions() {
@@ -123,4 +157,4 @@ function listActiveSessions() {
   return active;
 }
 
-module.exports = { peekSessionMeta, listAllSessions, listCwds, listActiveSessions };
+module.exports = { peekSessionMeta, listAllSessions, listCwds, listActiveSessions, searchSessions };
