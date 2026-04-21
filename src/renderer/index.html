@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline';">
+  <title>CC Terminal Manager</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <!-- Titlebar -->
+  <div id="titlebar">
+    <div class="titlebar-left">
+      <span class="titlebar-title">CC Terminal Manager</span>
+    </div>
+    <div class="titlebar-right">
+      <button id="btn-settings" class="titlebar-btn" title="设置">⚙</button>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div id="app">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-toolbar">
+        <button id="btn-new-session" class="sidebar-btn" title="新建 Session">+</button>
+        <button id="btn-refresh" class="sidebar-btn" title="刷新">↻</button>
+      </div>
+      <div id="session-list"></div>
+    </div>
+
+    <!-- Resize handle -->
+    <div id="resize-handle"></div>
+
+    <!-- Terminal area -->
+    <div id="terminal-area">
+      <div id="tab-bar"></div>
+      <div id="terminal-container"></div>
+    </div>
+  </div>
+
+  <!-- Modal overlay -->
+  <div id="modal-overlay" class="hidden"></div>
+
+  <script src="./main.js" type="module"></script>
+</body>
+</html>

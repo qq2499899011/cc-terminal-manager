@@ -1,0 +1,20 @@
+appId: com.cc-terminal-manager
+productName: CC Terminal Manager
+directories:
+  output: dist
+win:
+  target:
+    - target: dir
+      arch: [x64]
+  icon: null
+files:
+  - src/main/**/*
+  - src/preload/**/*
+  - src/shared/**/*
+  - dist-renderer/**/*
+  - hook-scripts/**/*
+  - package.json
+extraResources:
+  - from: hook-scripts/
+    to: hook-scripts/
+asar: true
