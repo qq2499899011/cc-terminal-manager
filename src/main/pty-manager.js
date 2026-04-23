@@ -117,7 +117,7 @@ function writeInput(sessionId, data) {
   if (s && s.status !== 'exited') {
     // 输入拦截：检测 Enter / Esc
     if (inputEventCallback) {
-      if (data.includes('\r') || data.includes('\n')) {
+      if (data === '\r' || data === '\n' || data === '\r\n') {
         inputEventCallback(sessionId, 'PTY_ENTER');
       } else if (data === '\x1b') {
         // 单独的 Esc 键

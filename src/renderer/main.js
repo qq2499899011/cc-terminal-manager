@@ -288,7 +288,7 @@ function closeSession(sessionId) {
 //   - 盲文 spinner: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷
 const RE_THINKING = /esc to interrupt|ctrl[+\-]c to (?:interrupt|cancel|stop)|[\u2726-\u273d]|[\u2801-\u28ff]/gi;
 // needs_approval: 审批面板标志（"Do you want to ..." 或 "❯ 1. Yes/Allow"）
-const RE_APPROVAL = /Do you want to (?:proceed|make|allow|run)|\u276f\s*1\.\s*Yes|\u276f\s*1\.\s*Allow|\u276f\s*1\.\s*Accept/gi;
+const RE_APPROVAL = /Do you want to (?:proceed|make|allow|run)|\u276f\s*1\.\s*Yes|\u276f\s*1\.\s*Allow|\u276f\s*1\.\s*Accept|\u276f\s*Accept\s+.*Decline|needs your input|requests your input/gi;
 // running/idle: 空的输入提示框
 //   新版 CC (v2.1+)：一行 "❯" 后紧跟大量空格（无侧边竖线，上下用 ─ 分隔）
 //   旧版 CC：带侧边竖线 "│ > ... │"

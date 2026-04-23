@@ -60,10 +60,12 @@ function installHooks(_hookScriptPath, port) {
   };
 
   settings.hooks.Stop = cleanAndAppend(settings.hooks.Stop, stopHook);
-  settings.hooks.Notification = cleanAndAppend(
-    cleanAndAppend(settings.hooks.Notification, notifPermission),
-    notifElicitation
-  );
+
+  // 先清一次，再把两条 notification hook 一起加进去，
+  // 避免嵌套 cleanAndAppend 导致第二次 removeMarked 把第一条也删掉
+  const cleanedNotif = removeMarked(settings.hooks.Notification || []);
+  cleanedNotif.push(notifPermission, notifElicitation);
+  settings.hooks.Notification = cleanedNotif;
 
   if (!settings.env) settings.env = {};
   settings.env.CC_MANAGER_HOOK_PORT = String(port);

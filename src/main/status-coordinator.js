@@ -3,6 +3,7 @@
 // FSM 状态变更时统一推送 IPC、通知、角标
 
 const SessionFSM = require('./session-fsm');
+const log = require('./logger');
 const { t } = require('../shared/i18n');
 const {
   IDLE, THINKING, WAITING, PENDING_REVIEW, ERROR, OFFLINE,
@@ -66,6 +67,8 @@ class StatusCoordinator {
     const sessionId = payload?.session_id;
     const cwd = payload?.cwd;
 
+    log.info('[coordinator] hook event:', type, 'session:', sessionId?.slice(0, 8) || '-', 'cwd:', cwd || '-');
+
     // 尝试绑定 claude session id
     if (sessionId) {
       const sessions = this._ptyManager.list();
@@ -73,6 +76,7 @@ class StatusCoordinator {
         if (s.cwd === cwd && !s.claudeSessionId) {
           this._ptyManager.bindClaudeId(s.internalId, sessionId);
           this._sendToRenderer('session:bind-claude-id', s.internalId, sessionId);
+          log.info('[coordinator] bound claude id', sessionId.slice(0, 8), '→', s.internalId.slice(0, 8));
           break;
         }
       }
@@ -80,7 +84,12 @@ class StatusCoordinator {
 
     // 找到匹配的内部 session
     const match = this._findSession(sessionId, cwd);
-    if (!match) return;
+    if (!match) {
+      log.warn('[coordinator] no matching session for hook event, session:', sessionId?.slice(0, 8) || '-', 'cwd:', cwd || '-');
+      return;
+    }
+
+    log.info('[coordinator] matched session:', match.internalId.slice(0, 8), 'fsm:', this._fsms.get(match.internalId)?.getState());
 
     // 映射 hook type 到 FSM 事件
     if (type === 'notification') {
@@ -152,12 +161,16 @@ class StatusCoordinator {
     // 延迟 8s 给真正的 Hook 事件留出时间先到达。
     if ((cur === THINKING || cur === WAITING) && mapped === IDLE) {
       if (fsm.getElapsed() >= 8000) {
+        log.info('[coordinator] screen correction: fallback HOOK_STOP for', sessionId.slice(0, 8), cur, '→ idle (elapsed', fsm.getElapsed(), 'ms)');
         fsm.dispatch(HOOK_STOP);
         this._tryAutoView(sessionId);
       }
       return;
     }
 
+    if (mapped !== cur) {
+      log.info('[coordinator] screen correction:', sessionId.slice(0, 8), cur, '→', mapped, '(suggested:', suggestedStatus, ')');
+    }
     fsm.correctIfStale(mapped);
   }
 
@@ -170,9 +183,20 @@ class StatusCoordinator {
 
   _findSession(claudeSessionId, cwd) {
     const sessions = this._ptyManager.list();
-    return sessions.find(s =>
-      s.claudeSessionId === claudeSessionId || s.cwd === cwd
-    ) || null;
+    // 优先精确匹配 claudeSessionId
+    if (claudeSessionId) {
+      const byId = sessions.find(s => s.claudeSessionId === claudeSessionId);
+      if (byId) return byId;
+    }
+    // 兜底：按 cwd 匹配（多个同 cwd 时取最近创建的）
+    if (cwd) {
+      const byCwd = sessions.filter(s => s.cwd === cwd);
+      if (byCwd.length === 1) return byCwd[0];
+      if (byCwd.length > 1) {
+        return byCwd.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+      }
+    }
+    return null;
   }
 
   /**
@@ -189,6 +213,8 @@ class StatusCoordinator {
       [OFFLINE]: 'exited',
     };
     const status = statusMap[newState] || 'running';
+
+    log.info('[coordinator] FSM transition:', sessionId.slice(0, 8), prevState, '→', newState, '(status:', status, ')');
 
     // 更新 pty-manager 中的状态
     this._ptyManager.updateStatus(sessionId, status);

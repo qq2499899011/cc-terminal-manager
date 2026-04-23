@@ -26,10 +26,12 @@ function tryListen(port, retries, resolve, reject) {
       req.on('end', () => {
         try {
           const event = JSON.parse(body);
+          log.info('[hook-server] received event:', event.type, 'notification_type:', event.payload?.notification_type || '-', 'session:', event.payload?.session_id?.slice(0, 8) || '-');
           if (eventHandler) eventHandler(event);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end('{"ok":true}');
         } catch {
+          log.warn('[hook-server] bad JSON from hook script');
           res.writeHead(400);
           res.end('{"error":"bad json"}');
         }
