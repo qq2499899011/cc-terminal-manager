@@ -3,6 +3,7 @@
 // FSM 状态变更时统一推送 IPC、通知、角标
 
 const SessionFSM = require('./session-fsm');
+const { t } = require('../shared/i18n');
 const {
   IDLE, THINKING, WAITING, PENDING_REVIEW, ERROR, OFFLINE,
   PTY_ENTER, PTY_ESC, HOOK_STOP, HOOK_NOTIFICATION, HOOK_STOP_FAILURE, PTY_EXIT, SESSION_VIEWED,
@@ -208,29 +209,29 @@ class StatusCoordinator {
 
     if (newState === WAITING && prevState !== WAITING) {
       this._notifier.notify({
-        title: '\u{1F7E1} CC等待您的审批',
-        body: `Claude 准备执行命令，请前往确认 - ${label}`,
+        title: t('notif_approval_title'),
+        body: t('notif_approval_body', label),
         type: 'needs_input',
         sessionId,
       });
     } else if (newState === PENDING_REVIEW) {
       this._notifier.notify({
-        title: '\u{1F7E2} CC回复已完毕',
-        body: `当前任务已告一段落 - ${label}`,
+        title: t('notif_stop_title'),
+        body: t('notif_stop_body', label),
         type: 'stop',
         sessionId,
       });
     } else if (newState === ERROR) {
       this._notifier.notify({
-        title: '\u{1F534} CC出现异常',
-        body: `进程崩溃或网络断开 - ${label}`,
+        title: t('notif_error_title'),
+        body: t('notif_error_body', label),
         type: 'error',
         sessionId,
       });
     } else if (newState === OFFLINE) {
       this._notifier.notify({
-        title: '\u{1F50C} CC终端已断开',
-        body: `进程退出 - ${label}`,
+        title: t('notif_offline_title'),
+        body: t('notif_offline_body', label),
         type: 'exit',
         sessionId,
       });

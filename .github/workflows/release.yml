@@ -1,0 +1,57 @@
+name: Build & Release
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SHA256 checksums
+        run: |
+          Get-ChildItem dist\*.exe, dist\*.zip | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$hash  $($_.Name)" | Out-File -Append -Encoding ascii dist\SHA256SUMS.txt
+          }
+        shell: pwsh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.zip
+            dist/latest.yml
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          body: |
+            ## Installation
+
+            Download `CC.Terminal.Manager-Setup-x.y.z.exe` or the portable `.zip`.
+
+            > **This build is not code-signed.** SmartScreen will show a warning — click "More info" then "Run anyway".
+
+            Verify download integrity against `SHA256SUMS.txt`.

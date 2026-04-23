@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const log = require('./logger');
 const { APP_DATA_DIR, META_FILE } = require('./paths');
 
 const DEFAULT_META = {
@@ -7,9 +8,9 @@ const DEFAULT_META = {
   cwdHistory: [],     // 最近使用的 cwd，最多 20 条
   settings: {
     defaultShell: 'pwsh',
-    // hooks 已重新启用 —— 通过 FSM + PTY 输入拦截 + Hook 事件三层信号源驱动状态
     hooksEnabled: true,
     notifyOnStop: true,
+    language: '',
   },
 };
 
@@ -33,7 +34,7 @@ function save() {
     fs.writeFileSync(META_FILE, JSON.stringify(cache, null, 2), 'utf8');
     return true;
   } catch (e) {
-    console.error('session-store save failed:', e.message);
+    log.error('[session-store] save failed:', e.message);
     return false;
   }
 }

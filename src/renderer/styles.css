@@ -47,7 +47,7 @@ html, body {
 
 .titlebar-left { display: flex; align-items: center; gap: 8px; }
 .titlebar-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-.titlebar-right { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+.titlebar-right { display: flex; gap: 4px; -webkit-app-region: no-drag; padding-right: 140px; }
 .titlebar-btn {
   background: none; border: none; color: var(--text-secondary);
   cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px;

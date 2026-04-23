@@ -1,6 +1,9 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const log = require('./logger');
+const i18n = require('../shared/i18n');
+const { t } = i18n;
 const ptyManager = require('./pty-manager');
 const jsonlReader = require('./jsonl-reader');
 const hookServer = require('./hook-server');
@@ -9,6 +12,8 @@ const notifier = require('./notifier');
 const sessionStore = require('./session-store');
 const badgeIcons = require('./badge-icons');
 const StatusCoordinator = require('./status-coordinator');
+const prerequisites = require('./prerequisites');
+const updaterLite = require('./updater-lite');
 const {
   SESSION_CREATE, SESSION_KILL, SESSION_RENAME, SESSION_LIST,
   PTY_INPUT, PTY_RESIZE, PTY_DATA, PTY_EXIT,
@@ -17,6 +22,9 @@ const {
   SESSION_STATUS_CHANGE, SESSION_BIND_CLAUDE_ID,
   SESSION_REPORT_STATUS, SESSION_ACTIVATED,
   HISTORY_SEARCH, SESSION_FOCUS, SESSION_AUTO_NAME,
+  LOG_EXPORT, LOG_RENDERER,
+  PREREQUISITES_CHECK,
+  UPDATE_CHECK,
 } = require('../shared/ipc-channels.cjs');
 
 let mainWindow = null;
@@ -202,14 +210,16 @@ ipcMain.handle(SETTINGS_GET, () => {
 });
 
 ipcMain.handle(SETTINGS_SET, (_e, partial) => {
+  if (partial.language !== undefined) {
+    i18n.setLocale(partial.language || i18n.detectDefaultLocale());
+  }
   return sessionStore.setSettings(partial);
 });
 
 // IPC: Hooks
 ipcMain.handle(HOOKS_ENABLE, async () => {
-  const hookScriptPath = path.join(__dirname, '..', '..', 'hook-scripts', 'cc-hook.js');
   const port = hookServer.getPort();
-  return hookInstaller.installHooks(hookScriptPath, port);
+  return hookInstaller.installHooks(null, port);
 });
 
 ipcMain.handle(HOOKS_DISABLE, () => {
@@ -224,11 +234,81 @@ ipcMain.handle(OPEN_DIRECTORY_DIALOG, async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+// IPC: Log export
+ipcMain.handle(LOG_EXPORT, async () => {
+  const { getLogDir } = require('./logger');
+  const logDir = getLogDir();
+  const savePath = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: `cc-terminal-manager-logs-${Date.now()}.zip`,
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+  });
+  if (savePath.canceled || !savePath.filePath) return null;
+  try {
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(savePath.filePath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(output);
+    archive.directory(logDir, 'logs');
+    await archive.finalize();
+    return savePath.filePath;
+  } catch (e) {
+    log.error('[log-export] failed:', e.message);
+    return null;
+  }
+});
+
+// IPC: Renderer log bridge
+ipcMain.on(LOG_RENDERER, (_e, level, msg) => {
+  const fn = log[level] || log.info;
+  fn.call(log, '[renderer]', msg);
+});
+
+// IPC: Prerequisites check
+ipcMain.handle(PREREQUISITES_CHECK, () => prerequisites.checkAll());
+
+// IPC: Update check
+ipcMain.handle(UPDATE_CHECK, () => updaterLite.checkForUpdates());
+
 // ---- App lifecycle ----
 app.whenReady().then(async () => {
+  app.setAppUserModelId('io.github.chenyue.cc-terminal-manager');
+
+  // 初始化 i18n（从持久化设置读取语言）
+  const savedSettings = sessionStore.getSettings();
+  if (savedSettings.language) {
+    i18n.setLocale(savedSettings.language);
+  }
+
   notifier.init(() => mainWindow);
   createWindow();
   createTray();
+
+  // 启动时前置依赖检测
+  try {
+    const result = await prerequisites.checkAll();
+    if (!result.ok) {
+      const failed = result.checks.filter(c => c.status === 'fail');
+      const detail = failed.map(c => `- ${c.name}: ${c.message}`).join('\n');
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: t('prereq_dialog_title'),
+        message: t('prereq_dialog_message', detail),
+        buttons: [t('prereq_continue'), t('prereq_guide'), t('prereq_exit')],
+        defaultId: 0,
+        cancelId: 2,
+      });
+      if (response === 1) {
+        const { shell } = require('electron');
+        const url = failed[0]?.remedy || 'https://github.com/chenyue/cc-terminal-manager#readme';
+        shell.openExternal(url);
+      } else if (response === 2) {
+        app.quit();
+        return;
+      }
+    }
+  } catch (e) {
+    log.warn('[prerequisites] check failed:', e.message);
+  }
 
   // 初始化 StatusCoordinator
   coordinator = new StatusCoordinator({
@@ -247,20 +327,22 @@ app.whenReady().then(async () => {
   // 启动 hook server
   try {
     const port = await hookServer.start(handleHookEvent);
-    console.log(`Hook server started on port ${port}`);
+    log.info('[hook-server] started on port', port);
 
     // 自动安装 hooks（如果设置允许）
     const settings = sessionStore.getSettings();
     if (settings.hooksEnabled) {
-      const hookScriptPath = path.join(__dirname, '..', '..', 'hook-scripts', 'cc-hook.js');
-      hookInstaller.installHooks(hookScriptPath, port);
+      hookInstaller.installHooks(null, port);
     } else {
       // 清理可能残留的旧 hooks（历史安装）
       try { hookInstaller.uninstallHooks(); } catch {}
     }
   } catch (e) {
-    console.error('Failed to start hook server:', e.message);
+    log.error('[hook-server] failed to start:', e.message);
   }
+
+  // 初始化轻量更新检查
+  updaterLite.init(() => mainWindow);
 });
 
 app.on('window-all-closed', () => {
@@ -324,8 +406,8 @@ function updateTrayBadge() {
     tray.setImage(badgeIcons.createTrayIcon(count));
     const tip = count > 0
       ? (approvalCount > 0
-          ? `CC Terminal Manager - ${approvalCount} 个待审批 / ${count} 个待处理`
-          : `CC Terminal Manager - ${count} 个待处理`)
+          ? t('tray_tooltip_both', approvalCount, count)
+          : t('tray_tooltip_pending', count))
       : 'CC Terminal Manager';
     tray.setToolTip(tip);
   }
@@ -335,7 +417,7 @@ function updateTrayBadge() {
     const overlay = badgeIcons.createOverlayIcon(count);
     try {
       if (overlay) {
-        mainWindow.setOverlayIcon(overlay, `${count} 个待处理`);
+        mainWindow.setOverlayIcon(overlay, t('overlay_pending', count));
       } else {
         mainWindow.setOverlayIcon(null, '');
       }

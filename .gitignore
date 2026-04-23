@@ -1,4 +1,12 @@
 node_modules/
 dist/
 dist-renderer/
+dist-hook/
+build/icon.png
+build/icon.ico
 *.exe
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

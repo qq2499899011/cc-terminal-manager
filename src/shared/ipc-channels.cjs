@@ -26,6 +26,17 @@ const SESSION_BIND_CLAUDE_ID = 'session:bind-claude-id';
 const SESSION_FOCUS = 'session:focus';
 const SESSION_AUTO_NAME = 'session:auto-name';
 
+// 日志
+const LOG_EXPORT = 'log:export';
+const LOG_RENDERER = 'log:renderer';
+
+// 前置依赖检测
+const PREREQUISITES_CHECK = 'prerequisites:check';
+
+// 更新
+const UPDATE_CHECK = 'update:check';
+const UPDATE_AVAILABLE_LITE = 'update:available-lite';
+
 module.exports = {
   SESSION_CREATE, SESSION_KILL, SESSION_RENAME, SESSION_LIST,
   PTY_INPUT, PTY_RESIZE, PTY_DATA, PTY_EXIT,
@@ -34,4 +45,7 @@ module.exports = {
   SESSION_STATUS_CHANGE, SESSION_BIND_CLAUDE_ID,
   SESSION_REPORT_STATUS, SESSION_ACTIVATED,
   HISTORY_SEARCH, SESSION_FOCUS, SESSION_AUTO_NAME,
+  LOG_EXPORT, LOG_RENDERER,
+  PREREQUISITES_CHECK,
+  UPDATE_CHECK, UPDATE_AVAILABLE_LITE,
 };

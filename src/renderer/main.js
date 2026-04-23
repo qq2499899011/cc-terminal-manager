@@ -5,7 +5,21 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { showNewSessionModal } from './modal-new.js';
 
-console.log('CC Terminal Manager renderer loaded');
+// i18n — renderer 端通过内联 JSON 加载（避免 require 在浏览器环境不可用）
+import en from '../shared/locales/en.json';
+import zhCN from '../shared/locales/zh-CN.json';
+
+const locales = { 'en': en, 'zh-CN': zhCN };
+let currentLocale = navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+
+function t(key, ...args) {
+  let str = locales[currentLocale]?.[key] || locales['en']?.[key] || key;
+  args.forEach((v, i) => { str = str.replaceAll(`{${i}}`, v); });
+  return str;
+}
+
+export function getLocale() { return currentLocale; }
+export function setLocale(lang) { currentLocale = lang; }
 
 // 事件总线
 class EventBus {
@@ -106,7 +120,7 @@ function renderTabs() {
     tab.className = 'tab' + (id === state.activeSessionId ? ' active' : '');
     tab.dataset.sessionId = id;
 
-    const label = s.info?.name || shortenCwd(s.info?.cwd) || 'Terminal';
+    const label = s.info?.name || shortenCwd(s.info?.cwd) || t('terminal');
     const dot = document.createElement('span');
     dot.className = 'status-dot dot-' + (s.info?.status || 'running');
     tab.appendChild(dot);
@@ -172,14 +186,14 @@ function renderSidebar() {
 
       const name = document.createElement('span');
       name.className = 'session-name';
-      name.textContent = item.info?.name || 'Session';
+      name.textContent = item.info?.name || t('session');
       el.appendChild(name);
 
       // 悬浮显示的改名按钮
       const renameBtn = document.createElement('span');
       renameBtn.className = 'rename-btn';
       renameBtn.textContent = '✎';
-      renameBtn.title = '重命名';
+      renameBtn.title = t('rename');
       renameBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         startRename(item.id);
@@ -194,7 +208,7 @@ function renderSidebar() {
   }
 
   if (state.sessions.size === 0) {
-    sessionList.innerHTML = '<div class="empty-state">点击 + 新建终端</div>';
+    sessionList.innerHTML = `<div class="empty-state">${t('empty_state')}</div>`;
   }
 }
 
@@ -218,7 +232,7 @@ function activateSession(sessionId) {
 
 async function newSession(cwd, resumeId, mode) {
   const result = await window.ccAPI.createSession({
-    cwd: cwd || 'C:\\projects\\AI-Studio',
+    cwd: cwd || '',
     resumeId: resumeId || undefined,
     mode: mode || 'default',
   });
@@ -230,7 +244,7 @@ async function newSession(cwd, resumeId, mode) {
     term, fitAddon, container,
     info: {
       internalId,
-      cwd: cwd || 'C:\\projects\\AI-Studio',
+      cwd: cwd || '',
       claudeSessionId: resumeId || null,  // 恢复时直接预填
       status: 'running',
       name: null,
@@ -533,7 +547,7 @@ window.ccAPI.onPtyExit((sessionId, code) => {
   const s = state.sessions.get(sessionId);
   if (s) {
     s.info.status = 'exited';
-    s.term.write(`\r\n\x1b[90m[Process exited with code ${code}]\x1b[0m\r\n`);
+    s.term.write(`\r\n\x1b[90m${t('process_exited', code)}\x1b[0m\r\n`);
     updateStatusDotDOM(sessionId, 'exited');
     try { window.ccAPI.reportStatusChange(sessionId, 'exited'); } catch {}
   }
@@ -581,9 +595,6 @@ document.addEventListener('mouseup', () => {
 
 // ---- 按钮事件 ----
 btnNew.addEventListener('click', async () => {
-  console.log('[DEBUG] + button clicked');
-  console.log('[DEBUG] ccAPI available:', !!window.ccAPI);
-  console.log('[DEBUG] ccAPI.listHistory:', typeof window.ccAPI?.listHistory);
   try {
     await showNewSessionModal(
       (cwd, resumeId, mode) => { newSession(cwd, resumeId, mode); },
@@ -606,7 +617,7 @@ btnNew.addEventListener('click', async () => {
       }
     );
   } catch (e) {
-    console.error('showNewSessionModal error:', e);
+    // logged via renderer bridge in Phase 1
   }
 });
 
@@ -629,14 +640,14 @@ function showContextMenu(x, y, sessionId) {
   menu.style.top = y + 'px';
 
   const items = [
-    { label: '重命名', action: () => startRename(sessionId) },
-    { label: '复制工作目录', action: () => navigator.clipboard.writeText(s.info?.cwd || '') },
-    { label: '在资源管理器中打开', action: () => {
+    { label: t('ctx_rename'), action: () => startRename(sessionId) },
+    { label: t('ctx_copy_cwd'), action: () => navigator.clipboard.writeText(s.info?.cwd || '') },
+    { label: t('ctx_open_explorer'), action: () => {
       // 通过 shell.openPath 需要 preload 暴露，这里用简单方式
       window.ccAPI.ptyInput(sessionId, ''); // placeholder
     }},
     { sep: true },
-    { label: '关闭', action: () => closeSession(sessionId), danger: true },
+    { label: t('ctx_close'), action: () => closeSession(sessionId), danger: true },
   ];
 
   for (const item of items) {
@@ -715,7 +726,7 @@ function startRename(sessionId) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = s.info?.name || '';
-  input.placeholder = 'Session 名称';
+  input.placeholder = t('rename_placeholder');
   input.style.cssText = 'width:100%;font-size:12px;padding:2px 4px;background:var(--bg-overlay);border:1px solid var(--accent);color:var(--text-primary);border-radius:2px;';
 
   const originalText = el.textContent;
@@ -790,36 +801,48 @@ btnSettings.addEventListener('click', showSettingsPanel);
 
 async function showSettingsPanel() {
   const settings = await window.ccAPI.getSettings();
+  const curLang = settings.language || '';
   modalOverlay.classList.remove('hidden');
   modalOverlay.innerHTML = `
     <div class="modal">
       <div class="modal-header">
-        <span>设置</span>
+        <span>${t('settings')}</span>
         <span class="modal-close" style="cursor:pointer;font-size:18px;">×</span>
       </div>
       <div class="modal-body">
         <div style="display:flex;flex-direction:column;gap:16px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="set-hooks" ${settings.hooksEnabled ? 'checked' : ''}>
-            <span>启用 Hooks（CC 事件通知）</span>
+            <span>${t('settings_hooks')}</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
             <input type="checkbox" id="set-notify-stop" ${settings.notifyOnStop ? 'checked' : ''}>
-            <span>CC 完成时弹窗通知</span>
+            <span>${t('settings_notify_stop')}</span>
           </label>
           <div>
-            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">默认 Shell</label>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">${t('settings_shell')}</label>
             <select id="set-shell" style="background:var(--bg-overlay);border:1px solid #313244;color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:13px;width:100%;">
               <option value="pwsh" ${settings.defaultShell === 'pwsh' ? 'selected' : ''}>PowerShell (pwsh)</option>
               <option value="powershell" ${settings.defaultShell === 'powershell' ? 'selected' : ''}>Windows PowerShell</option>
               <option value="cmd" ${settings.defaultShell === 'cmd' ? 'selected' : ''}>CMD</option>
             </select>
           </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">${t('settings_language')}</label>
+            <select id="set-language" style="background:var(--bg-overlay);border:1px solid #313244;color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:13px;width:100%;">
+              <option value="" ${!curLang ? 'selected' : ''}>${t('settings_lang_system')}</option>
+              <option value="en" ${curLang === 'en' ? 'selected' : ''}>English</option>
+              <option value="zh-CN" ${curLang === 'zh-CN' ? 'selected' : ''}>简体中文</option>
+            </select>
+          </div>
+          <div style="border-top:1px solid #313244;padding-top:12px;">
+            <button class="btn btn-secondary" id="btn-export-logs" style="font-size:12px;">${t('export_logs')}</button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="settings-cancel">取消</button>
-        <button class="btn btn-primary" id="settings-save">保存</button>
+        <button class="btn btn-secondary" id="settings-cancel">${t('cancel')}</button>
+        <button class="btn btn-primary" id="settings-save">${t('save')}</button>
       </div>
     </div>
   `;
@@ -829,12 +852,17 @@ async function showSettingsPanel() {
   modalOverlay.querySelector('#settings-cancel').addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
 
+  modalOverlay.querySelector('#btn-export-logs').addEventListener('click', () => {
+    window.ccAPI.exportLogs();
+  });
+
   modalOverlay.querySelector('#settings-save').addEventListener('click', async () => {
     const hooksEnabled = modalOverlay.querySelector('#set-hooks').checked;
     const notifyOnStop = modalOverlay.querySelector('#set-notify-stop').checked;
     const defaultShell = modalOverlay.querySelector('#set-shell').value;
+    const language = modalOverlay.querySelector('#set-language').value;
 
-    await window.ccAPI.setSettings({ hooksEnabled, notifyOnStop, defaultShell });
+    await window.ccAPI.setSettings({ hooksEnabled, notifyOnStop, defaultShell, language });
 
     // 启用/禁用 hooks
     if (hooksEnabled) {
@@ -843,9 +871,43 @@ async function showSettingsPanel() {
       await window.ccAPI.disableHooks();
     }
 
+    // 语言切换（不销毁 xterm）
+    const newLocale = language || (navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en');
+    if (newLocale !== currentLocale) {
+      setLocale(newLocale);
+      renderTabs();
+      renderSidebar();
+    }
+
     closeModal();
   });
 }
 
 // ---- 初始化 ----
 renderSidebar();
+
+// ---- 启动时从 settings 同步语言 ----
+(async () => {
+  try {
+    const settings = await window.ccAPI.getSettings();
+    if (settings.language) {
+      setLocale(settings.language);
+      renderTabs();
+      renderSidebar();
+    }
+  } catch {}
+})();
+
+// ---- 更新提示 ----
+window.ccAPI.onUpdateAvailableLite((info) => {
+  const existing = document.getElementById('update-banner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = 'position:fixed;top:38px;right:0;padding:4px 12px;background:#89b4fa;color:#1e1e2e;font-size:12px;cursor:pointer;z-index:9999;border-radius:0 0 0 6px;';
+  banner.textContent = t('update_available', info.version);
+  banner.addEventListener('click', () => {
+    window.open(info.url, '_blank');
+  });
+  document.body.appendChild(banner);
+});

@@ -12,7 +12,7 @@ const APP_DATA_DIR = path.join(process.env.APPDATA || path.join(os.homedir(), 'A
 const META_FILE = path.join(APP_DATA_DIR, 'meta.json');
 const SETTINGS_BACKUP_DIR = path.join(APP_DATA_DIR, 'backups');
 
-// Hook server — 避开 claude-hub 的 7788
+// Default hook server port; falls back to next free port
 const DEFAULT_HOOK_PORT = 7800;
 
 module.exports = {

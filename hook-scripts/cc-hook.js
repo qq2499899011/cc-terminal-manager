@@ -1,6 +1,22 @@
 #!/usr/bin/env node
 // cc-hook.js — Claude Code hook 脚本
 // 从 stdin 读取 CC 传入的 JSON，POST 到本地 hook-server
+// 也支持 --uninstall-hooks 命令（NSIS 卸载时调用）
+
+// 卸载模式：清理 ~/.claude/settings.json 中的 hook 条目
+if (process.argv[2] === '--uninstall-hooks') {
+  try {
+    require('../src/shared/hook-cleanup').uninstall();
+  } catch {
+    // 打包为 exe 后路径不同，尝试相对路径
+    try {
+      const path = require('path');
+      const cleanup = require(path.join(__dirname, '..', 'src', 'shared', 'hook-cleanup'));
+      cleanup.uninstall();
+    } catch {}
+  }
+  process.exit(0);
+}
 
 const http = require('http');
 

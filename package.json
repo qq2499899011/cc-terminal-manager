@@ -1,26 +1,54 @@
 {
   "name": "cc-terminal-manager",
-  "version": "0.1.0",
-  "description": "Claude Code 终端管理器",
+  "version": "0.2.0",
+  "description": "A tabbed terminal manager for Claude Code sessions on Windows",
+  "author": "chenyue <2499899011@qq.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/chenyue/cc-terminal-manager#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chenyue/cc-terminal-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chenyue/cc-terminal-manager/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "terminal",
+    "electron",
+    "pty",
+    "windows"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "main": "src/main/index.js",
   "scripts": {
     "dev": "vite build && electron . --dev",
     "dev:vite": "vite build --watch",
     "dev:electron": "electron . --dev",
     "build:renderer": "vite build",
-    "build": "vite build && electron-builder",
-    "rebuild": "electron-rebuild -f -w node-pty"
+    "build:hook": "node scripts/build-hook-exe.js",
+    "build:icon": "node scripts/generate-icon.js",
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "build": "npm run build:icon && npm run build:hook && vite build && electron-rebuild -f -w node-pty && electron-builder",
+    "build:dir": "npm run build:icon && npm run build:hook && vite build && electron-rebuild -f -w node-pty && electron-builder --dir"
   },
   "devDependencies": {
+    "@yao-pkg/pkg": "^6.18.2",
     "electron": "^32.2.7",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
     "vite": "^8.0.9"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
+    "archiver": "^7.0.1",
+    "electron-log": "^5.4.3",
     "node-pty": "^1.0.0"
   }
 }

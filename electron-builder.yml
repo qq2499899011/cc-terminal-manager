@@ -1,20 +1,45 @@
-appId: com.cc-terminal-manager
+appId: io.github.chenyue.cc-terminal-manager
 productName: CC Terminal Manager
 directories:
   output: dist
 win:
   target:
-    - target: dir
+    - target: nsis
       arch: [x64]
-  icon: null
+    - target: zip
+      arch: [x64]
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CC Terminal Manager
+  runAfterFinish: true
+  include: build/uninstaller.nsh
 files:
   - src/main/**/*
   - src/preload/**/*
   - src/shared/**/*
   - dist-renderer/**/*
-  - hook-scripts/**/*
   - package.json
+  - "!**/*.map"
+  - "!**/*.md"
+  - "!**/test/**"
+  - "!**/tests/**"
 extraResources:
-  - from: hook-scripts/
-    to: hook-scripts/
+  - from: dist-hook/
+    to: hook-bin/
+    filter: ["cc-hook.exe"]
 asar: true
+asarUnpack:
+  - "node_modules/node-pty/**/*"
+publish:
+  provider: github
+  owner: chenyue
+  repo: cc-terminal-manager
+  releaseType: release

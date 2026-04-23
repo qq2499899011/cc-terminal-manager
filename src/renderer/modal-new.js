@@ -1,4 +1,15 @@
 // 新建 / 恢复 Session 弹窗
+import { getLocale } from './main.js';
+import en from '../shared/locales/en.json';
+import zhCN from '../shared/locales/zh-CN.json';
+
+const _locales = { 'en': en, 'zh-CN': zhCN };
+function t(key, ...args) {
+  const cur = getLocale();
+  let str = _locales[cur]?.[key] || _locales['en']?.[key] || key;
+  args.forEach((v, i) => { str = str.replaceAll(`{${i}}`, v); });
+  return str;
+}
 
 const modalOverlay = document.getElementById('modal-overlay');
 
@@ -62,17 +73,17 @@ function render() {
     <div class="modal">
       <div class="modal-header">
         <div class="modal-tabs">
-          <span class="modal-tab ${currentTab === 'new' ? 'active' : ''}" data-tab="new">新建 CC</span>
-          <span class="modal-tab ${currentTab === 'resume' ? 'active' : ''}" data-tab="resume">从历史恢复</span>
+          <span class="modal-tab ${currentTab === 'new' ? 'active' : ''}" data-tab="new">${t('modal_new_cc')}</span>
+          <span class="modal-tab ${currentTab === 'resume' ? 'active' : ''}" data-tab="resume">${t('modal_resume')}</span>
         </div>
         <span class="modal-close" style="cursor:pointer;font-size:18px;">×</span>
       </div>
       <div class="modal-mode-bar" style="padding:8px 16px;border-bottom:1px solid #313244;display:flex;align-items:center;gap:8px;">
-        <label style="color:var(--text-secondary);font-size:12px;flex-shrink:0;">启动模式</label>
+        <label style="color:var(--text-secondary);font-size:12px;flex-shrink:0;">${t('modal_mode')}</label>
         <select id="mode-select" style="background:var(--bg-overlay);border:1px solid #313244;color:var(--text-primary);padding:4px 8px;border-radius:4px;font-size:12px;flex:1;">
-          <option value="default" ${lastUsedMode === 'default' ? 'selected' : ''}>默认</option>
-          <option value="yolo" ${lastUsedMode === 'yolo' ? 'selected' : ''}>YOLO模式 (跳过权限确认)</option>
-          <option value="plan" ${lastUsedMode === 'plan' ? 'selected' : ''}>Plan模式 (仅规划)</option>
+          <option value="default" ${lastUsedMode === 'default' ? 'selected' : ''}>${t('modal_mode_default')}</option>
+          <option value="yolo" ${lastUsedMode === 'yolo' ? 'selected' : ''}>${t('modal_mode_yolo')}</option>
+          <option value="plan" ${lastUsedMode === 'plan' ? 'selected' : ''}>${t('modal_mode_plan')}</option>
         </select>
       </div>
       <div class="modal-body">
@@ -80,8 +91,8 @@ function render() {
       </div>
       ${currentTab === 'new' ? `
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="modal-cancel">取消</button>
-        <button class="btn btn-primary" id="modal-create">创建</button>
+        <button class="btn btn-secondary" id="modal-cancel">${t('cancel')}</button>
+        <button class="btn btn-primary" id="modal-create">${t('modal_create')}</button>
       </div>` : ''}
     </div>
   `;
@@ -120,7 +131,7 @@ function render() {
     });
 
     createBtn.addEventListener('click', () => {
-      const cwd = cwdInput.value.trim() || cwdList[0] || 'C:\\projects\\AI-Studio';
+      const cwd = cwdInput.value.trim() || cwdList[0] || '';
       const mode = getSelectedMode();
       lastUsedCwd = cwd;
       lastUsedMode = mode;
@@ -171,16 +182,16 @@ function renderNewTab() {
   const options = cwdList.map(c => `<option value="${escHtml(c)}">`).join('');
   return `
     <div style="display:flex;flex-direction:column;gap:12px;">
-      <label style="color:var(--text-secondary);font-size:12px;">工作目录 (${cwdList.length} 个历史路径)</label>
+      <label style="color:var(--text-secondary);font-size:12px;">${t('modal_cwd_label', cwdList.length)}</label>
       <div style="display:flex;gap:8px;">
         <input type="text" id="cwd-input" list="cwd-datalist"
-               placeholder="选择或输入工作目录..."
+               placeholder="${t('modal_cwd_placeholder')}"
                value="${escHtml(lastUsedCwd)}"
                style="flex:1;">
         <datalist id="cwd-datalist">${options}</datalist>
-        <button class="btn btn-secondary" id="btn-browse">浏览</button>
+        <button class="btn btn-secondary" id="btn-browse">${t('modal_browse')}</button>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);">点击输入框下拉选择，或直接输入路径</div>
+      <div style="font-size:11px;color:var(--text-muted);">${t('modal_cwd_hint')}</div>
     </div>
   `;
 }
@@ -188,7 +199,7 @@ function renderNewTab() {
 function renderResumeTab() {
   return `
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <input type="search" id="search-input" placeholder="搜索 session（支持全文搜索）...">
+      <input type="search" id="search-input" placeholder="${t('modal_search_placeholder')}">
       <div id="session-list-container" style="max-height:400px;overflow-y:auto;"></div>
     </div>
   `;
@@ -223,7 +234,7 @@ function renderSessionList() {
   }
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">无匹配结果</div>';
+    container.innerHTML = `<div style="color:var(--text-muted);padding:20px;text-align:center;">${t('no_results')}</div>`;
     return;
   }
 
@@ -238,12 +249,12 @@ function renderSessionList() {
       </div>
       <div class="resume-cwd-items" id="${groupId}">`;
     for (const s of items.slice(0, 30)) {
-      const time = new Date(s.lastMtime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const time = new Date(s.lastMtime).toLocaleString(getLocale() === 'zh-CN' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const isOpen = openIds.has(s.sessionId);
       // B5: 优先显示自定义名称
       const displayName = s.customName || s.title || '(empty)';
       const subtitle = s.customName && s.title ? `<span style="font-size:10px;color:var(--text-muted);margin-left:4px;">${escHtml(s.title.slice(0, 40))}</span>` : '';
-      const openBadge = isOpen ? '<span style="color:var(--green);font-size:10px;margin-left:auto;flex-shrink:0;">已打开</span>' : '';
+      const openBadge = isOpen ? `<span style="color:var(--green);font-size:10px;margin-left:auto;flex-shrink:0;">${t('already_open')}</span>` : '';
       html += `<div class="resume-item" data-session-id="${escHtml(s.sessionId)}" data-cwd="${escHtml(s.cwd || '')}" data-is-open="${isOpen}">
         <div style="display:flex;align-items:center;gap:4px;">
           <span style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(displayName)}</span>${subtitle}${openBadge}

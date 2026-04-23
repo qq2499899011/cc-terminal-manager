@@ -1,4 +1,5 @@
 const http = require('http');
+const log = require('./logger');
 const { DEFAULT_HOOK_PORT } = require('./paths');
 
 let server = null;
@@ -50,7 +51,7 @@ function tryListen(port, retries, resolve, reject) {
 
   server.listen(port, '127.0.0.1', () => {
     currentPort = port;
-    console.log(`Hook server listening on 127.0.0.1:${port}`);
+    log.info('[hook-server] listening on 127.0.0.1:' + port);
     resolve(port);
   });
 }

@@ -1,56 +1,70 @@
 const fs = require('fs');
 const path = require('path');
+const log = require('./logger');
 const { CLAUDE_SETTINGS, SETTINGS_BACKUP_DIR } = require('./paths');
+const { uninstall: sharedUninstall } = require('../shared/hook-cleanup');
 
 const MARKER = '__cc_manager__';
 
 /**
+ * 获取 hook exe 路径（打包后用 exe，开发时用 node + js）
+ */
+function getHookExePath() {
+  const { app } = require('electron');
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'hook-bin', 'cc-hook.exe');
+  }
+  return path.join(__dirname, '..', '..', 'dist-hook', 'cc-hook.exe');
+}
+
+/**
+ * 判断 hook exe 是否存在，不存在则 fallback 到 node + js
+ */
+function makeHookCommand(eventType) {
+  const exePath = getHookExePath();
+  if (fs.existsSync(exePath)) {
+    return `"${exePath}" ${eventType}`;
+  }
+  // dev fallback: 使用 node 运行源文件
+  const jsPath = path.join(__dirname, '..', '..', 'hook-scripts', 'cc-hook.js');
+  return `node "${jsPath}" ${eventType}`;
+}
+
+/**
  * 注入 hooks 到 ~/.claude/settings.json
- * @param {string} hookScriptPath - cc-hook.js 的绝对路径
+ * @param {string} _hookScriptPath - 已废弃，保留参数兼容
  * @param {number} port - hook server 端口
  */
-function installHooks(hookScriptPath, port) {
-  // 读取现有 settings
+function installHooks(_hookScriptPath, port) {
   let settings = {};
   try {
     settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'));
   } catch {}
 
-  // 备份
   backup(settings);
 
-  // 构建 hook 命令
-  const escapedPath = hookScriptPath.replace(/\\/g, '\\\\');
-  const makeCmd = (eventType) =>
-    `node "${escapedPath}" ${eventType}`;
-
-  // 确保 hooks 对象存在
   if (!settings.hooks) settings.hooks = {};
 
-  // 注入 Stop hook
   const stopHook = {
     matcher: '',
-    hooks: [{ type: 'command', command: makeCmd('stop'), timeout: 5000, _marker: MARKER }],
+    hooks: [{ type: 'command', command: makeHookCommand('stop'), timeout: 5000, _marker: MARKER }],
   };
 
-  // 注入 Notification hooks — 分别用 matcher 捕获两种审批场景
   const notifPermission = {
     matcher: 'permission_prompt',
-    hooks: [{ type: 'command', command: makeCmd('notification'), timeout: 5000, _marker: MARKER }],
+    hooks: [{ type: 'command', command: makeHookCommand('notification'), timeout: 5000, _marker: MARKER }],
   };
   const notifElicitation = {
     matcher: 'elicitation_dialog',
-    hooks: [{ type: 'command', command: makeCmd('notification'), timeout: 5000, _marker: MARKER }],
+    hooks: [{ type: 'command', command: makeHookCommand('notification'), timeout: 5000, _marker: MARKER }],
   };
 
-  // 清理旧的 cc_manager hooks，保留用户自定义的
   settings.hooks.Stop = cleanAndAppend(settings.hooks.Stop, stopHook);
   settings.hooks.Notification = cleanAndAppend(
     cleanAndAppend(settings.hooks.Notification, notifPermission),
     notifElicitation
   );
 
-  // 写入环境变量让 hook 脚本知道端口
   if (!settings.env) settings.env = {};
   settings.env.CC_MANAGER_HOOK_PORT = String(port);
 
@@ -59,34 +73,10 @@ function installHooks(hookScriptPath, port) {
 }
 
 /**
- * 卸载 hooks
+ * 卸载 hooks — 委托给 shared/hook-cleanup
  */
 function uninstallHooks() {
-  let settings = {};
-  try {
-    settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'));
-  } catch { return false; }
-
-  if (settings.hooks) {
-    if (settings.hooks.Stop) {
-      settings.hooks.Stop = removeMarked(settings.hooks.Stop);
-      if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;
-    }
-    if (settings.hooks.Notification) {
-      settings.hooks.Notification = removeMarked(settings.hooks.Notification);
-      if (settings.hooks.Notification.length === 0) delete settings.hooks.Notification;
-    }
-    if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
-  }
-
-  // 清理环境变量
-  if (settings.env) {
-    delete settings.env.CC_MANAGER_HOOK_PORT;
-    if (Object.keys(settings.env).length === 0) delete settings.env;
-  }
-
-  fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2), 'utf8');
-  return true;
+  return sharedUninstall();
 }
 
 /**
@@ -138,7 +128,7 @@ function backup(settings) {
       fs.unlinkSync(path.join(SETTINGS_BACKUP_DIR, f));
     }
   } catch (e) {
-    console.error('Backup failed:', e.message);
+    log.error('[hook-installer] backup failed:', e.message);
   }
 }
 

@@ -23,6 +23,11 @@ const SESSION_ACTIVATED = 'session:activated';
 const HISTORY_SEARCH = 'history:search';
 const SESSION_FOCUS = 'session:focus';
 const SESSION_AUTO_NAME = 'session:auto-name';
+const LOG_EXPORT = 'log:export';
+const LOG_RENDERER = 'log:renderer';
+const PREREQUISITES_CHECK = 'prerequisites:check';
+const UPDATE_CHECK = 'update:check';
+const UPDATE_AVAILABLE_LITE = 'update:available-lite';
 
 contextBridge.exposeInMainWorld('ccAPI', {
   // Session management
@@ -94,4 +99,19 @@ contextBridge.exposeInMainWorld('ccAPI', {
 
   // 全文搜索历史
   searchHistory: (query) => ipcRenderer.invoke(HISTORY_SEARCH, query),
+
+  // 日志
+  exportLogs: () => ipcRenderer.invoke(LOG_EXPORT),
+  logRenderer: (level, msg) => ipcRenderer.send(LOG_RENDERER, level, msg),
+
+  // 前置依赖检测
+  checkPrerequisites: () => ipcRenderer.invoke(PREREQUISITES_CHECK),
+
+  // 更新
+  checkForUpdates: () => ipcRenderer.invoke(UPDATE_CHECK),
+  onUpdateAvailableLite: (cb) => {
+    const handler = (_e, info) => cb(info);
+    ipcRenderer.on(UPDATE_AVAILABLE_LITE, handler);
+    return () => ipcRenderer.removeListener(UPDATE_AVAILABLE_LITE, handler);
+  },
 });

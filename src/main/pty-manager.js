@@ -1,6 +1,7 @@
 const pty = require('node-pty');
 const { randomUUID } = require('crypto');
 const os = require('os');
+const log = require('./logger');
 
 // session 存储
 const sessions = new Map();
@@ -12,9 +13,19 @@ function setInputEventCallback(cb) {
   inputEventCallback = cb;
 }
 
-// 默认 shell
+// 默认 shell — Claude Code 需要 git-bash
 function getDefaultShell() {
   if (os.platform() === 'win32') {
+    if (process.env.CLAUDE_CODE_GIT_BASH_PATH) return process.env.CLAUDE_CODE_GIT_BASH_PATH;
+    const fs = require('fs');
+    const candidates = [
+      'D:\\Software\\Git\\bin\\bash.exe',
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
     return process.env.COMSPEC || 'cmd.exe';
   }
   return process.env.SHELL || '/bin/bash';
@@ -36,7 +47,7 @@ function createSession({ cwd, resumeId, shell, mode, onData, onExit }) {
   const shellPath = shell || getDefaultShell();
   const sessionCwd = cwd || process.cwd();
 
-  console.log('[PTY] Creating session:', { shellPath, sessionCwd, resumeId, mode });
+  log.info('[pty] creating session', { shellPath, sessionCwd, resumeId, mode });
 
   let ptyProcess;
   try {
@@ -48,7 +59,7 @@ function createSession({ cwd, resumeId, shell, mode, onData, onExit }) {
       env: { ...process.env, TERM: 'xterm-256color' },
     });
   } catch (e) {
-    console.error('[PTY] spawn failed:', e.message, { shellPath, sessionCwd });
+    log.error('[pty] spawn failed:', e.message, { shellPath, sessionCwd });
     throw e;
   }
 

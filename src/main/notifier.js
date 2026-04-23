@@ -1,4 +1,5 @@
 const { Notification } = require('electron');
+const log = require('./logger');
 
 let mainWindowRef = null;
 
@@ -34,7 +35,7 @@ function notify({ title, body, type, sessionId, onClick }) {
 
     notif.show();
   } catch (e) {
-    console.error('Notifier: show failed', e.message);
+    log.error('[notifier] show failed:', e.message);
   }
 
   // 窗口失焦时闪烁任务栏，提醒用户
