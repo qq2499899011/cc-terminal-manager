@@ -32,7 +32,7 @@ Windows 平台的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 
 
 ### 下载
 
-从 [Releases 页面](https://github.com/chenyue/cc-terminal-manager/releases) 下载最新版本：
+从 [Releases 页面](https://github.com/qq2499899011/cc-terminal-manager/releases) 下载最新版本：
 
 - **`CC.Terminal.Manager-Setup-x.y.z.exe`** — NSIS 安装包（推荐）
 - **`CC.Terminal.Manager-x.y.z-win-x64.zip`** — 便携版（免安装）
@@ -45,7 +45,7 @@ Windows 平台的 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 
 > 1. 点击 **"更多信息"**
 > 2. 点击 **"仍要运行"**
 >
-> 你可以通过 [Release 页面](https://github.com/chenyue/cc-terminal-manager/releases) 上的 SHA256 校验值验证安装包的完整性。
+> 你可以通过 [Release 页面](https://github.com/qq2499899011/cc-terminal-manager/releases) 上的 SHA256 校验值验证安装包的完整性。
 
 ## 工作原理
 
@@ -69,7 +69,7 @@ CC Terminal Manager 通过 Claude Code 的 [hooks 系统](https://docs.anthropic
 ## 开发
 
 ```bash
-git clone https://github.com/chenyue/cc-terminal-manager.git
+git clone https://github.com/qq2499899011/cc-terminal-manager.git
 cd cc-terminal-manager
 npm install
 npm run rebuild   # 为 Electron 重新编译 node-pty

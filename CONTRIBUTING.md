@@ -14,7 +14,7 @@ Thanks for your interest in contributing!
 ### Getting Started
 
 ```bash
-git clone https://github.com/chenyue/cc-terminal-manager.git
+git clone https://github.com/qq2499899011/cc-terminal-manager.git
 cd cc-terminal-manager
 npm install
 npm run rebuild   # rebuild node-pty for Electron
@@ -58,4 +58,4 @@ docs: update installation instructions
 
 ## Reporting Issues
 
-Use the [issue templates](https://github.com/chenyue/cc-terminal-manager/issues/new/choose) to report bugs or request features.
+Use the [issue templates](https://github.com/qq2499899011/cc-terminal-manager/issues/new/choose) to report bugs or request features.

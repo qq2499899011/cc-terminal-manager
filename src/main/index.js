@@ -271,7 +271,7 @@ ipcMain.handle(UPDATE_CHECK, () => updaterLite.checkForUpdates());
 
 // ---- App lifecycle ----
 app.whenReady().then(async () => {
-  app.setAppUserModelId('io.github.chenyue.cc-terminal-manager');
+  app.setAppUserModelId('io.github.qq2499899011.cc-terminal-manager');
 
   // 初始化 i18n（从持久化设置读取语言）
   const savedSettings = sessionStore.getSettings();
@@ -299,7 +299,7 @@ app.whenReady().then(async () => {
       });
       if (response === 1) {
         const { shell } = require('electron');
-        const url = failed[0]?.remedy || 'https://github.com/chenyue/cc-terminal-manager#readme';
+        const url = failed[0]?.remedy || 'https://github.com/qq2499899011/cc-terminal-manager#readme';
         shell.openExternal(url);
       } else if (response === 2) {
         app.quit();

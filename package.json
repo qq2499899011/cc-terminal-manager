@@ -4,13 +4,13 @@
   "description": "A tabbed terminal manager for Claude Code sessions on Windows",
   "author": "chenyue <2499899011@qq.com>",
   "license": "MIT",
-  "homepage": "https://github.com/chenyue/cc-terminal-manager#readme",
+  "homepage": "https://github.com/qq2499899011/cc-terminal-manager#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chenyue/cc-terminal-manager.git"
+    "url": "git+https://github.com/qq2499899011/cc-terminal-manager.git"
   },
   "bugs": {
-    "url": "https://github.com/chenyue/cc-terminal-manager/issues"
+    "url": "https://github.com/qq2499899011/cc-terminal-manager/issues"
   },
   "keywords": [
     "claude-code",

@@ -12,7 +12,7 @@ function init(getMainWindow) {
 async function checkForUpdates() {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/chenyue/cc-terminal-manager/releases/latest`,
+      `https://api.github.com/repos/qq2499899011/cc-terminal-manager/releases/latest`,
       { headers: { 'User-Agent': 'cc-terminal-manager' } }
     );
     if (!res.ok) return;

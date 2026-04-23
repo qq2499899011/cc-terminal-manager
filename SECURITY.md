@@ -26,7 +26,7 @@ CC Terminal Manager is a **local-only** desktop application. It does **not** upl
 
 If you discover a security vulnerability, please report it through one of these channels:
 
-1. **GitHub Security Advisory**: [Create a private advisory](https://github.com/chenyue/cc-terminal-manager/security/advisories/new)
+1. **GitHub Security Advisory**: [Create a private advisory](https://github.com/qq2499899011/cc-terminal-manager/security/advisories/new)
 2. **Email**: 2499899011@qq.com
 
 Please include:

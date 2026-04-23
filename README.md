@@ -32,7 +32,7 @@ A tabbed terminal manager for [Claude Code](https://docs.anthropic.com/en/docs/c
 
 ### Download
 
-Download the latest release from the [Releases page](https://github.com/chenyue/cc-terminal-manager/releases):
+Download the latest release from the [Releases page](https://github.com/qq2499899011/cc-terminal-manager/releases):
 
 - **`CC.Terminal.Manager-Setup-x.y.z.exe`** — NSIS installer (recommended)
 - **`CC.Terminal.Manager-x.y.z-win-x64.zip`** — Portable version (no install needed)
@@ -45,7 +45,7 @@ Download the latest release from the [Releases page](https://github.com/chenyue/
 > 1. Click **"More info"**
 > 2. Click **"Run anyway"**
 >
-> You can verify the authenticity of the installer by checking the SHA256 checksum published on the [Release page](https://github.com/chenyue/cc-terminal-manager/releases).
+> You can verify the authenticity of the installer by checking the SHA256 checksum published on the [Release page](https://github.com/qq2499899011/cc-terminal-manager/releases).
 
 ## How It Works
 
@@ -69,7 +69,7 @@ CC Terminal Manager integrates with Claude Code through its [hooks system](https
 ## Development
 
 ```bash
-git clone https://github.com/chenyue/cc-terminal-manager.git
+git clone https://github.com/qq2499899011/cc-terminal-manager.git
 cd cc-terminal-manager
 npm install
 npm run rebuild   # rebuild node-pty for Electron

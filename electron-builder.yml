@@ -1,4 +1,4 @@
-appId: io.github.chenyue.cc-terminal-manager
+appId: io.github.qq2499899011.cc-terminal-manager
 productName: CC Terminal Manager
 directories:
   output: dist
@@ -40,6 +40,6 @@ asarUnpack:
   - "node_modules/node-pty/**/*"
 publish:
   provider: github
-  owner: chenyue
+  owner: qq2499899011
   repo: cc-terminal-manager
   releaseType: release
