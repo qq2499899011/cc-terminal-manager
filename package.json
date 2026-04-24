@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.18.2",
-    "electron": "^32.2.7",
+    "electron": "^41.3.0",
     "electron-builder": "^26.8.1",
     "electron-rebuild": "^3.2.9",
     "png-to-ico": "^3.0.1",
