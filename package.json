@@ -1,6 +1,6 @@
 {
   "name": "cc-terminal-manager",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A tabbed terminal manager for Claude Code sessions on Windows",
   "author": "chenyue <2499899011@qq.com>",
   "license": "MIT",
